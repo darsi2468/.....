@@ -1,0 +1,19 @@
+def fibonacci_sum(n):
+    if n <= 0:
+        return 0
+    elif n == 1:
+        return 1
+    
+    a, b = 0, 1  # Первые два числа Фибоначчи
+    sum_fib = a + b  # Сумма первых двух чисел Фибоначчи
+
+    for _ in range(2, n):
+        a, b = b, a + b  # Генерация следующего числа Фибоначчи
+        sum_fib += b     # Добавление его к сумме
+
+    return sum_fib
+
+# Ввод числа n
+n = int(input("Введите количество чисел Фибоначчи: "))
+result = fibonacci_sum(n)
+print(f"Сумма первых {n} чисел Фибоначчи: {result}")
