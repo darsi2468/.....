@@ -1,0 +1,21 @@
+def count_word_occurrences(text, word):
+    # Приводим текст и слово к нижнему регистру для регистронезависимого поиска
+    text = text.lower()
+    word = word.lower()
+    
+    # Разбиваем текст на слова
+    words = text.split()
+    
+    # Считаем количество вхождений слова
+    count = words.count(word)
+    
+    return count
+
+# Ввод текста
+text = input("Введите текст: ")
+# Ввод слова для поиска
+word = input("Введите слово для поиска: ")
+
+# Подсчет и вывод количества вхождений
+occurrences = count_word_occurrences(text, word)
+print(f"Слово '{word}' встречается {occurrences} раз(а) в тексте.")
