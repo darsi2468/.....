@@ -1,0 +1,249 @@
+1. Model (расчёт, обработка истории)
+// CalculatorModel.java
+import java.io.*;
+import java.util.*;
+import net.objecthunter.exp4j.*;
+
+public class CalculatorModel {
+    private final List<String> history = new ArrayList<>();
+    private final String historyFile = "calc_history.log";
+
+    public CalculatorModel() {
+        loadHistory();
+    }
+
+    // Основной вычислительный метод
+    public double calculate(String expression) throws Exception {
+        // Замена оператора ** или ^ на ^
+        expression = expression.replace("**", "^");
+        // Замена // на / (для целочисленного деления)
+        expression = expression.replaceAll("\\s*//\\s*", "/");
+        // Операция остатка от деления (%, exp4j поддерживает)
+        
+        // Вычисление используя exp4j
+        Expression e = new ExpressionBuilder(expression).build();
+        double result = e.evaluate();
+        String record = expression + " = " + result;
+        history.add(record);
+        return result;
+    }
+
+    // Сохранение истории в файл
+    public void saveHistory() {
+        saveHistory(new File(historyFile));
+    }
+
+    // Сохранение выбранных уравнений в отдельный файл
+    public void saveSelectedHistory(List<Integer> indices, File file) {
+        try(BufferedWriter bw = new BufferedWriter(new FileWriter(file))) {
+            for (int idx : indices) {
+                if (idx >= 0 && idx < history.size())
+                    bw.write(history.get(idx) + "\n");
+            }
+        } catch(IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    // Сохранение всей истории в указанный файл
+    public void saveHistory(File file) {
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(file))) {
+            for (String s : history) {
+                bw.write(s + "\n");
+            }
+        } catch(IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    // Загрузка истории при запуске
+    private void loadHistory() {
+        File file = new File(historyFile);
+        if (file.exists()) {
+            try(BufferedReader br = new BufferedReader(new FileReader(file))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    history.add(line);
+                }
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
+
+    public List<String> getHistory() {
+        return history;
+    }
+
+    public String getHistoryFilePath() {
+        return new File(historyFile).getAbsolutePath();
+    }
+}
+2. View (ввод/вывод)
+// CalculatorView.java
+import java.util.List;
+import java.util.Scanner;
+
+public class CalculatorView {
+    private final Scanner scanner = new Scanner(System.in);
+
+    public void printMenu() {
+        System.out.println("=== Калькулятор ===");
+        System.out.println("1. Новое выражение");
+        System.out.println("2. Просмотр истории");
+        System.out.println("3. Сохранить историю в файл");
+        System.out.println("4. Выбрать уравнения и сохранить в файл");
+        System.out.println("5. Выход");
+        System.out.print("Выберите действие: ");
+    }
+
+    public String getExpression() {
+        System.out.print("Введите выражение: ");
+        return scanner.nextLine();
+    }
+
+    public void showResult(double result) {
+        System.out.println("Результат: " + result);
+    }
+
+    public void showHistory(List<String> history) {
+        System.out.println("История:");
+        for (int i = 0; i < history.size(); i++) {
+            System.out.println((i+1) + ": " + history.get(i));
+        }
+    }
+
+    public String getFilenameRequest() {
+        System.out.print("Введите имя файла/путь (или оставьте пустым): ");
+        return scanner.nextLine();
+    }
+
+    public String getEquationNumbersRequest() {
+        System.out.print("Введите номера уравнений через запятую: ");
+        return scanner.nextLine();
+    }
+
+    public void showMessage(String msg) {
+        System.out.println(msg);
+    }
+}
+3. Controller (логика работы)
+// CalculatorController.java
+import java.io.File;
+import java.util.*;
+import java.nio.file.*;
+
+public class CalculatorController {
+    private final CalculatorModel model;
+    private final CalculatorView view;
+
+    public CalculatorController(CalculatorModel m, CalculatorView v) {
+        this.model = m;
+        this.view = v;
+    }
+
+    public void run() {
+        while (true) {
+            view.printMenu();
+            String choice = new Scanner(System.in).nextLine();
+            switch(choice) {
+                case "1":
+                    newExpression();
+                    break;
+                case "2":
+                    view.showHistory(model.getHistory());
+                    break;
+                case "3":
+                    saveHistory();
+                    break;
+                case "4":
+                    saveSelected();
+                    break;
+                case "5":
+                    model.saveHistory();
+                    view.showMessage("До свидания! История сохранена в: " + model.getHistoryFilePath());
+                    return;
+                default:
+                    view.showMessage("Неверный выбор!");
+            }
+        }
+    }
+
+    private void newExpression() {
+        String expr = view.getExpression();
+        try {
+            double res = model.calculate(expr);
+            view.showResult(res);
+        } catch (Exception ex) {
+            view.showMessage("Ошибка в выражении: " + ex.getMessage());
+        }
+    }
+
+    private void saveHistory() {
+        String fname = view.getFilenameRequest().trim();
+        File destFile = getFileByUserInput(fname);
+        model.saveHistory(destFile);
+        view.showMessage("История сохранена в: " + destFile.getAbsolutePath());
+    }
+
+    private void saveSelected() {
+        view.showHistory(model.getHistory());
+        String nums = view.getEquationNumbersRequest();
+        List<Integer> indices = new ArrayList<>();
+        try {
+            for (String n : nums.split(",")) {
+                indices.add(Integer.parseInt(n.trim()) - 1);
+            }
+            String fname = view.getFilenameRequest().trim();
+            File destFile = getFileByUserInput(fname);
+            model.saveSelectedHistory(indices, destFile);
+            view.showMessage("Выбранные уравнения сохранены в: " + destFile.getAbsolutePath());
+        } catch(Exception ex) {
+            view.showMessage("Ошибка: " + ex.getMessage());
+        }
+    }
+
+    // Логика выбора файла в зависимости от входных данных
+    private File getFileByUserInput(String userInput) {
+        if (userInput.isEmpty()) {
+            // По умолчанию — текущий history файл
+            view.showMessage("История хранится в: " + model.getHistoryFilePath());
+            return new File(model.getHistoryFilePath());
+        } else if (userInput.contains(File.separator)) {
+            Path path = Paths.get(userInput);
+            if (Files.isDirectory(path)) {
+                // Если путь — директория, создаём log.log
+                return new File(path.toFile(), "log.log");
+            } else {
+                // Абсолютный путь
+                return path.toFile();
+            }
+        } else if (userInput.contains(".")) {
+            // Имя файла с расширением (без пути)
+            return new File(System.getProperty("user.dir"), userInput);
+        } else {
+            // Только имя директории
+            return new File(userInput + File.separator + "log.log");
+        }
+    }
+}
+4. Main (запуск)
+// Main.java
+public class Main {
+    public static void main(String[] args) {
+        CalculatorModel model = new CalculatorModel();
+        CalculatorView view = new CalculatorView();
+        CalculatorController controller = new CalculatorController(model, view);
+        controller.run();
+    }
+}
+External Library
+Для парсинга выражений использована exp4j.
+Подключи её как Maven dependency:
+
+<dependency>
+    <groupId>net.objecthunter</groupId>
+    <artifactId>exp4j</artifactId>
+    <version>0.4.8</version>
+</dependency>
+Или скачай jar файл и добавь его в classpath.
